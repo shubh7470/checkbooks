@@ -16,11 +16,12 @@
     "build": "npm run build:vite && npm run build:electron",
     "lint": "eslint .",
     "preview": "vite preview",
-    "dist:mac": "npm run build && electron-builder --mac",
-    "dist:win": "npm run build && electron-builder --win",
-    "dist:all": "npm run build && electron-builder -mw"
+    "dist:mac": "npm run build && electron-builder --mac --publish never",
+    "dist:win": "npm run build && electron-builder --win --publish never",
+    "dist:all": "npm run build && electron-builder -mw --publish never"
   },
   "build": {
+    "publish": null,
     "appId": "in.hindustaan.chequeprint",
     "productName": "ChequePrint",
     "directories": {
