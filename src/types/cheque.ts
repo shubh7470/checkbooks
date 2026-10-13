@@ -8,6 +8,10 @@ export interface FieldPosition {
   lineHeight?: number; // in mm (for multi-line amount in words)
 }
 
+export type FeedOrientation = 'vertical' | 'horizontal';
+export type FeedDirection = 'stub-first' | 'date-first';
+export type TrayAlignment = 'center' | 'left' | 'right';
+
 export interface ChequeLayout {
   id: string;
   name: string;
@@ -20,6 +24,10 @@ export interface ChequeLayout {
   // Global offset calibration (mm)
   globalOffsetX: number;
   globalOffsetY: number;
+  // Feed orientation & printer tray positioning
+  feedOrientation?: FeedOrientation; // 'vertical' (93mm short edge first - anti-jam) or 'horizontal' (203mm long edge first)
+  feedDirection?: FeedDirection;     // 'stub-first' (payee near top) or 'date-first'
+  trayAlignment?: TrayAlignment;     // 'center', 'left', 'right'
   // Field positions (mm)
   date: FieldPosition;
   payee: FieldPosition;
@@ -54,6 +62,9 @@ export interface AppSettings {
   activeLayoutId: string;
   customLayouts: ChequeLayout[];
   lastUsedLayoutId: string;
+  feedOrientation?: FeedOrientation;
+  feedDirection?: FeedDirection;
+  trayAlignment?: TrayAlignment;
 }
 
 export interface PrintOptions {
@@ -61,4 +72,7 @@ export interface PrintOptions {
   layout: ChequeLayout;
   isTestPrint: boolean; // prints border and alignment marks
   printerName?: string;
+  feedOrientation?: FeedOrientation;
+  feedDirection?: FeedDirection;
+  trayAlignment?: TrayAlignment;
 }

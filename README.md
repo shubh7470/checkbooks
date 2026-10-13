@@ -16,6 +16,10 @@ A lightweight, secure, and private macOS desktop application designed to print d
   - ICICI Bank
   - Axis Bank
   - Custom user-created presets
+- **Anti-Jam Cheque Feed Orientation (Rotated 90° / Landscape Feed)**:
+  - Feed cheques short-edge first (~93 mm) into manual tray guides (Centered, Left, or Right).
+  - Rotates print text 90° so paper feeds continuously along the full 203 mm length, completely eliminating paper jams and stuck cheques.
+  - Supports both Stub-first (default) and Date-first leading edges, plus classic Horizontal feed.
 - **Global & Field Calibration**:
   - Global X/Y millimeter offset sliders to match any printer feeder tray (envelope/center feed vs standard edge feed).
   - Individual field coordinate (X, Y in mm) and font size (pt) adjusters.

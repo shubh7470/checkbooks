@@ -5,13 +5,16 @@ import { splitAmountInWords } from './amountToWords';
 export function generateChequePrintHtml(options: PrintOptions): string {
   const { chequeData, layout, isTestPrint } = options;
 
+  const feedOrientation = options.feedOrientation || layout.feedOrientation || 'vertical';
+  const feedDirection = options.feedDirection || layout.feedDirection || 'stub-first';
+  const trayAlignment = options.trayAlignment || layout.trayAlignment || 'center';
+
   const totalOffsetX = layout.globalOffsetX || 0;
   const totalOffsetY = layout.globalOffsetY || 0;
 
-  // Format Date: exactly 8 digits with equal 4mm spacing across all boxes
+  // Format Date: exactly 8 digits with equal spacing across all boxes
   const rawDate = (chequeData.date || '').replace(/\D/g, '').padEnd(8, ' ');
   const dateChars = rawDate.split('').slice(0, 8);
-
   const charPitch = layout.date.letterSpacing || 4.0; // 4mm per digit box
 
   // Format amount in words split into two lines
@@ -24,7 +27,7 @@ export function generateChequePrintHtml(options: PrintOptions): string {
     layout.prefixSuffixMarkers
   );
 
-  // Absolute coordinates in mm within the header cheque portion
+  // Absolute coordinates in mm within the cheque bounding box
   const dateX = layout.date.x + totalOffsetX;
   const dateY = layout.date.y + totalOffsetY;
 
@@ -43,13 +46,35 @@ export function generateChequePrintHtml(options: PrintOptions): string {
   const acPayeeX = layout.acPayee.x + totalOffsetX;
   const acPayeeY = layout.acPayee.y + totalOffsetY;
 
+  // Sheet Dimensions (A4 standard: 210mm x 297mm)
+  const sheetWidthMm = 210;
+
+  const isVertical = feedOrientation === 'vertical';
+  const slotWidthMm = isVertical ? layout.heightMm : layout.widthMm;
+  const slotHeightMm = isVertical ? layout.widthMm : layout.heightMm;
+
+  let slotLeftMm = 0;
+  if (isVertical) {
+    if (trayAlignment === 'center') {
+      slotLeftMm = (sheetWidthMm - slotWidthMm) / 2; // (210 - 93) / 2 = 58.5mm
+    } else if (trayAlignment === 'right') {
+      slotLeftMm = sheetWidthMm - slotWidthMm; // 117mm
+    }
+  }
+
+  const containerTransform = isVertical
+    ? (feedDirection === 'stub-first'
+        ? `translate(${slotLeftMm + layout.heightMm}mm, 0mm) rotate(90deg)`
+        : `translate(${slotLeftMm}mm, ${layout.widthMm}mm) rotate(270deg)`)
+    : 'translate(0mm, 0mm)';
+
   return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
   <title>ChequePrint Output</title>
   <style>
-    /* Portrait A4 page size with Cheque located in Header Portion */
+    /* A4 page size with Cheque aligned for printer tray */
     @page {
       size: 210mm 297mm;
       margin: 0mm !important;
@@ -70,21 +95,23 @@ export function generateChequePrintHtml(options: PrintOptions): string {
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
-    /* Full Portrait A4 Page */
-    .portrait-sheet {
+    /* Full A4 Page */
+    .print-sheet {
       position: relative;
       width: 210mm;
       height: 297mm;
       overflow: hidden;
       background: ${isTestPrint ? '#FFFFFF' : 'transparent'};
     }
-    /* Header Portion: Cheque bounding area at the top of the portrait sheet */
-    .cheque-header-area {
+    /* Cheque Bounding Area with Orientation Transform */
+    .cheque-container {
       position: absolute;
       top: 0;
       left: 0;
       width: ${layout.widthMm}mm;
       height: ${layout.heightMm}mm;
+      transform-origin: top left;
+      transform: ${containerTransform};
       overflow: hidden;
     }
     .field {
@@ -113,7 +140,7 @@ export function generateChequePrintHtml(options: PrintOptions): string {
       transform-origin: center;
     }
 
-    /* Test calibration guide for A4 Portrait Plain Paper Test */
+    /* Test calibration guides */
     .test-cheque-outline {
       position: absolute;
       top: 0;
@@ -125,42 +152,87 @@ export function generateChequePrintHtml(options: PrintOptions): string {
     }
     .test-header-info {
       position: absolute;
-      top: ${layout.heightMm - 5}mm;
-      left: 10mm;
-      font-size: 7.5pt;
+      top: ${layout.heightMm - 6}mm;
+      left: 8mm;
+      font-size: 7pt;
       color: #64748B;
       font-family: monospace;
     }
-    .test-sheet-marker {
+    .test-tray-guide {
       position: absolute;
-      top: ${layout.heightMm}mm;
-      left: 0;
-      right: 0;
-      border-bottom: 0.5px dotted #CBD5E1;
-      font-size: 7pt;
-      color: #94A3B8;
-      padding-left: 5mm;
-      padding-top: 1mm;
+      top: 0;
+      bottom: 0;
+      width: 0;
+      border-left: 0.5px dashed #CBD5E1;
+      pointer-events: none;
+    }
+    .test-feeder-banner {
+      position: absolute;
+      top: 1mm;
+      font-size: 6.5pt;
       font-family: monospace;
+      color: #047857;
+      text-align: center;
+      border: 0.5px solid #10B981;
+      background: #ECFDF5;
+      padding: 1.5px 4px;
+      border-radius: 2px;
+      white-space: nowrap;
+    }
+    .test-bottom-marker {
+      position: absolute;
+      font-size: 6.5pt;
+      font-family: monospace;
+      color: #64748B;
+      border-top: 0.5px dotted #94A3B8;
+      padding-top: 1mm;
+      text-align: center;
     }
   </style>
 </head>
 <body>
-  <div class="portrait-sheet">
-    <!-- Header Portion: Cheque Area -->
-    <div class="cheque-header-area">
+  <div class="print-sheet">
+    ${
+      isTestPrint && feedOrientation === 'vertical'
+        ? `
+      <!-- Paper Tray Side Guides -->
+      <div class="test-tray-guide" style="left: ${slotLeftMm}mm;"></div>
+      <div class="test-tray-guide" style="left: ${slotLeftMm + slotWidthMm}mm;"></div>
+
+      <!-- Feeder Direction Banner -->
+      <div class="test-feeder-banner" style="left: ${slotLeftMm}mm; width: ${slotWidthMm}mm;">
+        &uarr; INSERT THIS SHORT EDGE (${slotWidthMm}mm) FIRST &uarr;<br>
+        (${feedDirection === 'stub-first' ? 'Stub / Left Edge' : 'Date / Right Edge'} &bull; ${trayAlignment.toUpperCase()} TRAY)
+      </div>
+
+      <!-- Bottom Edge Marker -->
+      <div class="test-bottom-marker" style="top: ${slotHeightMm}mm; left: ${slotLeftMm}mm; width: ${slotWidthMm}mm;">
+        &uarr; Physical Cheque Edge (${slotHeightMm}mm) &uarr;
+      </div>
+    `
+        : isTestPrint && feedOrientation === 'horizontal'
+        ? `
+      <div class="test-bottom-marker" style="top: ${slotHeightMm}mm; left: 0; width: 210mm;">
+        &uarr; Physical Cheque Edge (${slotHeightMm}mm) &bull; Insert long edge top-first &uarr;
+      </div>
+    `
+        : ''
+    }
+
+    <!-- Transformed Cheque Area -->
+    <div class="cheque-container">
       ${
         isTestPrint
           ? `
         <div class="test-cheque-outline"></div>
         <div class="test-header-info">
-          CHEQUEPRINT PORTRAIT HEADER &bull; ${layout.name} (${layout.widthMm}mm &times; ${layout.heightMm}mm) &bull; Scale: 100%
+          CHEQUEPRINT ${feedOrientation.toUpperCase()} &bull; ${layout.name} (${layout.widthMm}mm &times; ${layout.heightMm}mm) &bull; Scale: 100%
         </div>
       `
           : ''
       }
 
-      <!-- Cheque Date: 8 equal 4mm boxes without extra gap -->
+      <!-- Cheque Date: 8 equal 4mm boxes -->
       <div
         class="field"
         style="
@@ -257,16 +329,6 @@ export function generateChequePrintHtml(options: PrintOptions): string {
           : ''
       }
     </div>
-
-    ${
-      isTestPrint
-        ? `
-      <div class="test-sheet-marker">
-        &uarr; Physical Cheque Edge (Top ${layout.heightMm}mm) &bull; Feed paper top-first into printer tray
-      </div>
-    `
-        : ''
-    }
   </div>
 </body>
 </html>`;

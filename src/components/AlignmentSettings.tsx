@@ -6,7 +6,6 @@ import {
   Save,
   Plus,
   Trash2,
-  Info,
   Check,
   Move,
   Type,
@@ -52,8 +51,8 @@ export const AlignmentSettings: React.FC<AlignmentSettingsProps> = ({
   const [newPresetName, setNewPresetName] = useState('');
   const [isSavedAlert, setIsSavedAlert] = useState(false);
 
-  // Side-by-side Portrait Preview Controls
-  const [viewMode, setViewMode] = useState<'portrait' | 'zoom'>('portrait');
+  // Side-by-side Sheet / Zoom Preview Controls
+  const [viewMode, setViewMode] = useState<'sheet' | 'zoom'>('sheet');
   const [showGuides, setShowGuides] = useState(true);
   const [activeField, setActiveField] = useState<string | null>(null);
 
@@ -102,7 +101,7 @@ export const AlignmentSettings: React.FC<AlignmentSettingsProps> = ({
     setTimeout(() => setIsSavedAlert(false), 2000);
   };
 
-  // Preview Data Preparation (uses actual user input if available, otherwise sample values)
+  // Preview Data Preparation
   const sampleData = {
     payeeName: formData?.payeeName?.trim() ? formData.payeeName : 'Rahul Sharma',
     amount: formData?.amount !== '' && formData?.amount !== undefined ? formData.amount : 125000,
@@ -131,7 +130,280 @@ export const AlignmentSettings: React.FC<AlignmentSettingsProps> = ({
   const toPercentX = (mm: number) => ((mm + totalOffsetX) / draftLayout.widthMm) * 100;
   const toPercentY = (mm: number) => ((mm + totalOffsetY) / draftLayout.heightMm) * 100;
 
-  const fontScale = viewMode === 'portrait' ? 0.72 : 0.88;
+  const fontScale = viewMode === 'sheet' ? 0.72 : 0.88;
+
+  // Feed Geometry
+  const isVerticalFeed = (draftLayout.feedOrientation || 'vertical') === 'vertical';
+  const feedDirection = draftLayout.feedDirection || 'stub-first';
+  const trayAlignment = draftLayout.trayAlignment || 'center';
+
+  const slotWidthMm = isVerticalFeed ? draftLayout.heightMm : draftLayout.widthMm;
+  const slotHeightMm = isVerticalFeed ? draftLayout.widthMm : draftLayout.heightMm;
+
+  let slotLeftMm = 0;
+  if (isVerticalFeed) {
+    if (trayAlignment === 'center') {
+      slotLeftMm = (210 - slotWidthMm) / 2; // ~58.5mm
+    } else if (trayAlignment === 'right') {
+      slotLeftMm = 210 - slotWidthMm; // ~117mm
+    }
+  }
+
+  const slotLeftPercent = (slotLeftMm / 210) * 100;
+  const slotWidthPercent = (slotWidthMm / 210) * 100;
+  const slotHeightPercent = (slotHeightMm / 297) * 100;
+
+  // Reusable cheque content renderer (Guides + Fields)
+  const renderChequeInnerContent = (scaleMultiplier: number) => (
+    <>
+      {/* Background Cheque Pre-printed Guides */}
+      {showGuides && (
+        <div className="absolute inset-0 pointer-events-none opacity-35">
+          {/* Outer border guide */}
+          <div className="absolute inset-1.5 border border-dashed border-slate-300" />
+
+          {/* Date Boxes Guide (Top Right around 148mm, 8.5mm) */}
+          <div
+            style={{
+              left: `${(148 / draftLayout.widthMm) * 100}%`,
+              top: `${(8.5 / draftLayout.heightMm) * 100}%`,
+              width: `${((8 * 4.0) / draftLayout.widthMm) * 100}%`,
+            }}
+            className="absolute flex items-center"
+          >
+            {['D', 'D', 'M', 'M', 'Y', 'Y', 'Y', 'Y'].map((lbl, idx) => (
+              <div
+                key={idx}
+                className="flex-1 h-3.5 border border-slate-300 flex items-center justify-center text-[6px] font-mono text-slate-400 -ml-[0.5px]"
+              >
+                {lbl}
+              </div>
+            ))}
+          </div>
+
+          {/* PAY Guide */}
+          <div
+            style={{
+              left: `${(14 / draftLayout.widthMm) * 100}%`,
+              top: `${(21.5 / draftLayout.heightMm) * 100}%`,
+            }}
+            className="absolute text-[8px] font-bold text-slate-400 uppercase"
+          >
+            PAY
+          </div>
+          <div
+            style={{
+              left: `${(24 / draftLayout.widthMm) * 100}%`,
+              top: `${(24.5 / draftLayout.heightMm) * 100}%`,
+              right: '18%',
+            }}
+            className="absolute border-b border-dotted border-slate-300"
+          />
+
+          {/* RUPEES Guide */}
+          <div
+            style={{
+              left: `${(14 / draftLayout.widthMm) * 100}%`,
+              top: `${(29.5 / draftLayout.heightMm) * 100}%`,
+            }}
+            className="absolute text-[8px] font-bold text-slate-400 uppercase"
+          >
+            RUPEES
+          </div>
+          <div
+            style={{
+              left: `${(32 / draftLayout.widthMm) * 100}%`,
+              top: `${(32.5 / draftLayout.heightMm) * 100}%`,
+              right: '30%',
+            }}
+            className="absolute border-b border-dotted border-slate-300"
+          />
+          <div
+            style={{
+              left: `${(14 / draftLayout.widthMm) * 100}%`,
+              top: `${(40.5 / draftLayout.heightMm) * 100}%`,
+              right: '30%',
+            }}
+            className="absolute border-b border-dotted border-slate-300"
+          />
+
+          {/* ₹ Box Guide */}
+          <div
+            style={{
+              left: `${(144 / draftLayout.widthMm) * 100}%`,
+              top: `${(34 / draftLayout.heightMm) * 100}%`,
+              width: '24%',
+              height: '11%',
+            }}
+            className="absolute border border-slate-300 rounded-xs flex items-center px-1"
+          >
+            <span className="text-[8px] font-bold text-slate-300">₹</span>
+          </div>
+
+          {/* MICR Band Guide at bottom of cheque */}
+          <div className="absolute bottom-1 left-4 right-4 h-4 border-t border-slate-200 flex items-center justify-between text-[7px] font-mono text-slate-300">
+            <span>|&bull; 123456 |&bull;</span>
+            <span>110002001 &bull;:</span>
+            <span>000123 &bull; 10</span>
+          </div>
+        </div>
+      )}
+
+      {/* LIVE FIELD 1: DATE */}
+      <div
+        style={{
+          left: `${toPercentX(draftLayout.date.x)}%`,
+          top: `${toPercentY(draftLayout.date.y)}%`,
+          width: `${((8 * charPitch) / draftLayout.widthMm) * 100}%`,
+        }}
+        className={`absolute flex items-center z-10 transition-all ${
+          activeField === 'date'
+            ? 'ring-2 ring-emerald-500 bg-emerald-500/10 rounded px-0.5'
+            : ''
+        }`}
+      >
+        {dateChars.map((char, index) => (
+          <div
+            key={index}
+            style={{
+              fontSize: `${draftLayout.date.fontSize * scaleMultiplier}pt`,
+              fontWeight: draftLayout.date.fontWeight === 'normal' ? 400 : 700,
+            }}
+            className="flex-1 text-center font-mono text-slate-900 leading-none select-none"
+          >
+            {char.trim()}
+          </div>
+        ))}
+        {activeField === 'date' && (
+          <span className="absolute -top-5 left-0 text-[8px] bg-emerald-700 text-white font-mono px-1 rounded shadow-xs whitespace-nowrap z-30">
+            Date: X={draftLayout.date.x} Y={draftLayout.date.y}
+          </span>
+        )}
+      </div>
+
+      {/* LIVE FIELD 2: PAYEE NAME */}
+      <div
+        style={{
+          left: `${toPercentX(draftLayout.payee.x)}%`,
+          top: `${toPercentY(draftLayout.payee.y)}%`,
+          fontSize: `${draftLayout.payee.fontSize * scaleMultiplier}pt`,
+          fontWeight: draftLayout.payee.fontWeight === 'normal' ? 400 : 700,
+          maxWidth: `${((draftLayout.payee.maxWidth || 125) / draftLayout.widthMm) * 100}%`,
+        }}
+        className={`absolute z-10 truncate text-slate-900 select-none transition-all ${
+          activeField === 'payee'
+            ? 'ring-2 ring-emerald-500 bg-emerald-500/10 rounded px-1'
+            : ''
+        }`}
+      >
+        {draftLayout.prefixSuffixMarkers ? `** ` : ''}
+        {sampleData.payeeName}
+        {draftLayout.prefixSuffixMarkers ? ` **` : ''}
+        {activeField === 'payee' && (
+          <span className="absolute -top-5 left-0 text-[8px] bg-emerald-700 text-white font-mono px-1 rounded shadow-xs whitespace-nowrap z-30">
+            Payee: X={draftLayout.payee.x} Y={draftLayout.payee.y}
+          </span>
+        )}
+      </div>
+
+      {/* LIVE FIELD 3: AMOUNT IN WORDS LINE 1 */}
+      <div
+        style={{
+          left: `${toPercentX(draftLayout.amountInWordsLine1.x)}%`,
+          top: `${toPercentY(draftLayout.amountInWordsLine1.y)}%`,
+          fontSize: `${draftLayout.amountInWordsLine1.fontSize * scaleMultiplier}pt`,
+          fontWeight: draftLayout.amountInWordsLine1.fontWeight === 'bold' ? 700 : 400,
+          maxWidth: `${((draftLayout.amountInWordsLine1.maxWidth || 105) / draftLayout.widthMm) * 100}%`,
+        }}
+        className={`absolute z-10 truncate text-slate-900 select-none transition-all ${
+          activeField === 'amountInWordsLine1'
+            ? 'ring-2 ring-emerald-500 bg-emerald-500/10 rounded px-1'
+            : ''
+        }`}
+      >
+        {wordsLine1}
+        {activeField === 'amountInWordsLine1' && (
+          <span className="absolute -top-5 left-0 text-[8px] bg-emerald-700 text-white font-mono px-1 rounded shadow-xs whitespace-nowrap z-30">
+            Words L1: X={draftLayout.amountInWordsLine1.x} Y={draftLayout.amountInWordsLine1.y}
+          </span>
+        )}
+      </div>
+
+      {/* LIVE FIELD 4: AMOUNT IN WORDS LINE 2 */}
+      {wordsLine2 && (
+        <div
+          style={{
+            left: `${toPercentX(draftLayout.amountInWordsLine2.x)}%`,
+            top: `${toPercentY(draftLayout.amountInWordsLine2.y)}%`,
+            fontSize: `${draftLayout.amountInWordsLine2.fontSize * scaleMultiplier}pt`,
+            fontWeight: draftLayout.amountInWordsLine2.fontWeight === 'bold' ? 700 : 400,
+            maxWidth: `${((draftLayout.amountInWordsLine2.maxWidth || 130) / draftLayout.widthMm) * 100}%`,
+          }}
+          className={`absolute z-10 truncate text-slate-900 select-none transition-all ${
+            activeField === 'amountInWordsLine2'
+              ? 'ring-2 ring-emerald-500 bg-emerald-500/10 rounded px-1'
+              : ''
+          }`}
+        >
+          {wordsLine2}
+          {activeField === 'amountInWordsLine2' && (
+            <span className="absolute -top-5 left-0 text-[8px] bg-emerald-700 text-white font-mono px-1 rounded shadow-xs whitespace-nowrap z-30">
+              Words L2: X={draftLayout.amountInWordsLine2.x} Y={draftLayout.amountInWordsLine2.y}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* LIVE FIELD 5: NUMERIC AMOUNT */}
+      <div
+        style={{
+          left: `${toPercentX(draftLayout.amountInNumbers.x)}%`,
+          top: `${toPercentY(draftLayout.amountInNumbers.y)}%`,
+          fontSize: `${draftLayout.amountInNumbers.fontSize * scaleMultiplier}pt`,
+          fontWeight: draftLayout.amountInNumbers.fontWeight === 'normal' ? 400 : 700,
+        }}
+        className={`absolute z-10 text-slate-900 font-mono select-none transition-all ${
+          activeField === 'amountInNumbers'
+            ? 'ring-2 ring-emerald-500 bg-emerald-500/10 rounded px-1'
+            : ''
+        }`}
+      >
+        {formattedAmount}
+        {activeField === 'amountInNumbers' && (
+          <span className="absolute -top-5 left-0 text-[8px] bg-emerald-700 text-white font-mono px-1 rounded shadow-xs whitespace-nowrap z-30">
+            Amount: X={draftLayout.amountInNumbers.x} Y={draftLayout.amountInNumbers.y}
+          </span>
+        )}
+      </div>
+
+      {/* LIVE FIELD 6: A/C PAYEE MARKING */}
+      {sampleData.isAcPayee && (
+        <div
+          style={{
+            left: `${toPercentX(draftLayout.acPayee.x)}%`,
+            top: `${toPercentY(draftLayout.acPayee.y)}%`,
+          }}
+          className={`absolute z-10 select-none transition-all ${
+            activeField === 'acPayee' ? 'ring-2 ring-emerald-500 rounded p-0.5' : ''
+          }`}
+        >
+          <div
+            style={{
+              fontSize: `${draftLayout.acPayee.fontSize * (scaleMultiplier * 0.9)}pt`,
+            }}
+            className="flex flex-col items-center justify-center border-t border-b border-slate-900 px-1 py-0.5 text-slate-900 font-bold tracking-wider -rotate-30 origin-center bg-white/80"
+          >
+            A/C PAYEE ONLY
+          </div>
+          {activeField === 'acPayee' && (
+            <span className="absolute -top-5 left-0 text-[8px] bg-emerald-700 text-white font-mono px-1 rounded shadow-xs whitespace-nowrap z-30">
+              A/C Payee: X={draftLayout.acPayee.x} Y={draftLayout.acPayee.y}
+            </span>
+          )}
+        </div>
+      )}
+    </>
+  );
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5">
@@ -146,7 +418,7 @@ export const AlignmentSettings: React.FC<AlignmentSettingsProps> = ({
               <h3 className="text-base font-semibold text-slate-900 tracking-tight flex items-center gap-2">
                 Alignment & Printer Settings
                 <span className="text-[11px] font-normal text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
-                  Live Portrait Preview
+                  {isVerticalFeed ? 'Anti-Jam Rotated Feed (93mm)' : 'Horizontal Feed (203mm)'}
                 </span>
               </h3>
               <p className="text-xs text-slate-500">
@@ -163,10 +435,10 @@ export const AlignmentSettings: React.FC<AlignmentSettingsProps> = ({
           </button>
         </div>
 
-        {/* Modal Split Body: Left Settings & Right Portrait Preview */}
-        <div className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
-          {/* LEFT COLUMN: Controls & Tabs */}
-          <div className="w-full lg:w-[50%] xl:w-[48%] flex flex-col min-h-0 border-b lg:border-b-0 lg:border-r border-slate-200 bg-white">
+        {/* Modal Split Body: Left Settings & Right Preview */}
+        <div className="flex flex-col lg:flex-row flex-1 overflow-hidden min-h-0">
+          {/* LEFT COLUMN: Controls & Presets */}
+          <div className="w-full lg:w-[50%] xl:w-[48%] flex flex-col border-r border-slate-200 bg-white min-h-0">
             {/* Tab Navigation */}
             <div className="px-6 border-b border-slate-200 flex gap-6 text-xs font-semibold bg-white shrink-0">
               <button
@@ -189,7 +461,7 @@ export const AlignmentSettings: React.FC<AlignmentSettingsProps> = ({
                     : 'border-transparent text-slate-500 hover:text-slate-900'
                 }`}
               >
-                Printer & Global Offset
+                Printer & Feed Setup
               </button>
               <button
                 type="button"
@@ -248,8 +520,8 @@ export const AlignmentSettings: React.FC<AlignmentSettingsProps> = ({
 
                         <div className="flex items-center gap-2.5 flex-wrap">
                           {/* X (mm) */}
-                          <div className="flex items-center gap-1">
-                            <span className="text-[11px] text-slate-500 font-mono font-medium">X:</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[11px] text-slate-500 font-mono">X:</span>
                             <input
                               type="number"
                               step="0.5"
@@ -262,8 +534,8 @@ export const AlignmentSettings: React.FC<AlignmentSettingsProps> = ({
                           </div>
 
                           {/* Y (mm) */}
-                          <div className="flex items-center gap-1">
-                            <span className="text-[11px] text-slate-500 font-mono font-medium">Y:</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[11px] text-slate-500 font-mono">Y:</span>
                             <input
                               type="number"
                               step="0.5"
@@ -275,14 +547,14 @@ export const AlignmentSettings: React.FC<AlignmentSettingsProps> = ({
                             <span className="text-[10px] text-slate-400">mm</span>
                           </div>
 
-                          {/* Font Size */}
-                          <div className="flex items-center gap-1">
+                          {/* Font Size (pt) */}
+                          <div className="flex items-center gap-1.5 ml-auto">
                             <Type className="w-3 h-3 text-slate-400" />
                             <input
                               type="number"
                               step="0.5"
-                              min="8"
-                              max="20"
+                              min="6"
+                              max="24"
                               value={pos.fontSize}
                               onFocus={() => setActiveField(key)}
                               onChange={(e) => updateField(key, 'fontSize', parseFloat(e.target.value) || 10)}
@@ -293,8 +565,8 @@ export const AlignmentSettings: React.FC<AlignmentSettingsProps> = ({
 
                           {/* Date Letter Spacing */}
                           {hasSpacing && (
-                            <div className="flex items-center gap-1">
-                              <span className="text-[11px] text-slate-500 font-mono font-medium">Pitch:</span>
+                            <div className="flex items-center gap-1.5 w-full pt-1.5 mt-1 border-t border-slate-200/60">
+                              <span className="text-[11px] text-slate-500">Box Pitch / Spacing:</span>
                               <input
                                 type="number"
                                 step="0.1"
@@ -315,14 +587,136 @@ export const AlignmentSettings: React.FC<AlignmentSettingsProps> = ({
                 </div>
               )}
 
-              {/* TAB 2: PRINTER & GLOBAL OFFSET */}
+              {/* TAB 2: PRINTER & FEED SETUP */}
               {activeTab === 'calibration' && (
-                <div className="space-y-5">
-                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-2.5 text-[11px] text-amber-800 leading-relaxed">
-                    <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                    <div>
-                      <strong>Printer Tray Feed Notice:</strong> Use <strong>Global X/Y Offsets</strong> below to shift the entire cheque layout together to match physical printer trays.
+                <div className="space-y-4">
+                  {/* Cheque Paper Feed & Orientation (Anti-Jam Feature) */}
+                  <div className="p-4 bg-emerald-50/60 rounded-xl border border-emerald-200/90 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-semibold text-emerald-950 flex items-center gap-1.5 text-xs">
+                        <ArrowUp className="w-4 h-4 text-emerald-600" />
+                        Cheque Feed & Orientation (Anti-Jam)
+                      </h4>
+                      <span className="text-[10px] font-semibold text-emerald-800 bg-emerald-100/90 px-2 py-0.5 rounded-full">
+                        Recommended
+                      </span>
                     </div>
+
+                    <p className="text-[11px] text-emerald-900/80 leading-relaxed">
+                      Feeding cheques short-edge first (~93mm) ensures printer rollers maintain full grip along the 203mm length, eliminating paper jams and stuck cheques.
+                    </p>
+
+                    {/* Feed Mode Toggle */}
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1.5">
+                        Feed Orientation Mode:
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setDraftLayout({ ...draftLayout, feedOrientation: 'vertical' })}
+                          className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                            isVerticalFeed
+                              ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                              : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
+                          }`}
+                        >
+                          <div className="font-semibold text-xs flex items-center justify-between">
+                            <span>Vertical / Rotated Feed</span>
+                            {isVerticalFeed && <Check className="w-3.5 h-3.5" />}
+                          </div>
+                          <div className={`text-[10px] mt-0.5 ${
+                            isVerticalFeed ? 'text-emerald-100' : 'text-slate-500'
+                          }`}>
+                            Short edge 93mm first (Anti-Jam)
+                          </div>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setDraftLayout({ ...draftLayout, feedOrientation: 'horizontal' })}
+                          className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                            !isVerticalFeed
+                              ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                              : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
+                          }`}
+                        >
+                          <div className="font-semibold text-xs flex items-center justify-between">
+                            <span>Horizontal Feed</span>
+                            {!isVerticalFeed && <Check className="w-3.5 h-3.5" />}
+                          </div>
+                          <div className={`text-[10px] mt-0.5 ${
+                            !isVerticalFeed ? 'text-emerald-100' : 'text-slate-500'
+                          }`}>
+                            Long edge 203mm first (Classic)
+                          </div>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Options for Vertical Feed */}
+                    {isVerticalFeed && (
+                      <div className="pt-2.5 border-t border-emerald-200/70 space-y-3">
+                        {/* Feed Leading Edge */}
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-700 mb-1.5">
+                            Leading Edge (Enters printer first):
+                          </label>
+                          <div className="grid grid-cols-2 gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setDraftLayout({ ...draftLayout, feedDirection: 'stub-first' })}
+                              className={`px-3 py-2 rounded-lg border text-xs transition-all cursor-pointer ${
+                                feedDirection === 'stub-first'
+                                  ? 'bg-white text-emerald-700 border-emerald-500 shadow-xs font-semibold ring-1 ring-emerald-500/20'
+                                  : 'bg-white/80 text-slate-600 border-slate-200 hover:bg-white'
+                              }`}
+                            >
+                              Stub / Left Edge First
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setDraftLayout({ ...draftLayout, feedDirection: 'date-first' })}
+                              className={`px-3 py-2 rounded-lg border text-xs transition-all cursor-pointer ${
+                                feedDirection === 'date-first'
+                                  ? 'bg-white text-emerald-700 border-emerald-500 shadow-xs font-semibold ring-1 ring-emerald-500/20'
+                                  : 'bg-white/80 text-slate-600 border-slate-200 hover:bg-white'
+                              }`}
+                            >
+                              Date / Right Edge First
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Tray Alignment */}
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-700 mb-1.5">
+                            Printer Tray Guide Position:
+                          </label>
+                          <div className="grid grid-cols-3 gap-2">
+                            {[
+                              { id: 'center' as const, label: 'Centered', desc: 'Dual guides (~58.5mm)' },
+                              { id: 'left' as const, label: 'Left Guide', desc: 'Flush left (0mm)' },
+                              { id: 'right' as const, label: 'Right Guide', desc: 'Flush right (~117mm)' },
+                            ].map(({ id, label, desc }) => (
+                              <button
+                                key={id}
+                                type="button"
+                                onClick={() => setDraftLayout({ ...draftLayout, trayAlignment: id })}
+                                className={`px-2 py-1.5 rounded-lg border text-left transition-all cursor-pointer ${
+                                  trayAlignment === id
+                                    ? 'bg-white text-emerald-700 border-emerald-500 shadow-xs font-semibold ring-1 ring-emerald-500/20'
+                                    : 'bg-white/80 text-slate-600 border-slate-200 hover:bg-white'
+                                }`}
+                              >
+                                <div className="text-[11px] font-medium leading-tight">{label}</div>
+                                <div className="text-[9px] text-slate-400 mt-0.5">{desc}</div>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Printer Device Selection */}
@@ -481,38 +875,38 @@ export const AlignmentSettings: React.FC<AlignmentSettingsProps> = ({
                         type="button"
                         onClick={handleCreateNewPreset}
                         disabled={!newPresetName.trim()}
-                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg font-medium text-xs cursor-pointer"
+                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg font-medium text-xs cursor-pointer transition-colors"
                       >
-                        Save Preset
+                        Create
                       </button>
                     </div>
                   </div>
 
-                  <div className="pt-2 flex items-center justify-between border-t border-slate-200">
-                    <div>
-                      <h5 className="font-semibold text-slate-800">Reset Alignment</h5>
-                      <p className="text-[11px] text-slate-500">
-                        Restores factory default coordinates for this bank
-                      </p>
-                    </div>
+                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+                    <h4 className="font-semibold text-slate-900">
+                      Reset Active Layout
+                    </h4>
+                    <p className="text-[11px] text-slate-500">
+                      Reverts all field offsets and calibrations for "{draftLayout.name}" back to initial bank factory defaults.
+                    </p>
                     <button
                       type="button"
                       onClick={onResetLayout}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-100 text-slate-700 font-medium cursor-pointer"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-200 font-medium cursor-pointer text-xs mt-2"
                     >
                       <RotateCcw className="w-3.5 h-3.5" />
-                      Reset to Default
+                      Reset to Bank Standard
                     </button>
                   </div>
 
                   {draftLayout.isCustom && (
-                    <div className="pt-2 flex items-center justify-between border-t border-slate-200">
-                      <div>
-                        <h5 className="font-semibold text-rose-700">Delete Custom Preset</h5>
-                        <p className="text-[11px] text-slate-500">
-                          Permanently remove "{draftLayout.name}"
-                        </p>
-                      </div>
+                    <div className="p-4 bg-rose-50/60 rounded-xl border border-rose-200 space-y-2">
+                      <h4 className="font-semibold text-rose-900">
+                        Delete Custom Preset
+                      </h4>
+                      <p className="text-[11px] text-rose-600">
+                        Permanently remove preset "{draftLayout.name}".
+                      </p>
                       <button
                         type="button"
                         onClick={() => {
@@ -533,14 +927,14 @@ export const AlignmentSettings: React.FC<AlignmentSettingsProps> = ({
             </div>
           </div>
 
-          {/* RIGHT COLUMN ("Baju me"): LIVE PORTRAIT VIEW PREVIEW */}
+          {/* RIGHT COLUMN: LIVE SHEET PREVIEW */}
           <div className="w-full lg:w-[50%] xl:w-[52%] flex flex-col min-h-0 bg-slate-100/90 border-t lg:border-t-0">
             {/* Preview Toolbar */}
             <div className="px-5 py-3 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2.5 bg-white shrink-0">
               <div className="flex items-center gap-2">
                 <Eye className="w-4 h-4 text-emerald-600" />
                 <h4 className="font-semibold text-slate-900 text-xs">
-                  Live Portrait Sheet Preview
+                  Live Tray Sheet Preview
                 </h4>
                 <span className="text-[10px] font-mono bg-slate-100 text-slate-600 px-2 py-0.5 rounded border border-slate-200">
                   A4: 210 &times; 297 mm
@@ -553,16 +947,16 @@ export const AlignmentSettings: React.FC<AlignmentSettingsProps> = ({
                 <div className="flex bg-slate-100 rounded-lg p-0.5 border border-slate-200">
                   <button
                     type="button"
-                    onClick={() => setViewMode('portrait')}
+                    onClick={() => setViewMode('sheet')}
                     className={`flex items-center gap-1 px-2.5 py-1 rounded text-[11px] font-medium transition-colors cursor-pointer ${
-                      viewMode === 'portrait'
+                      viewMode === 'sheet'
                         ? 'bg-white text-emerald-700 shadow-xs'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
-                    title="View entire Portrait A4 sheet with cheque aligned in top header"
+                    title="View entire A4 printer tray with cheque feed alignment"
                   >
                     <FileText className="w-3 h-3" />
-                    <span>Portrait A4</span>
+                    <span>A4 Tray Sheet</span>
                   </button>
                   <button
                     type="button"
@@ -572,7 +966,7 @@ export const AlignmentSettings: React.FC<AlignmentSettingsProps> = ({
                         ? 'bg-white text-emerald-700 shadow-xs'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
-                    title="Zoom in on the 203x93mm Cheque Header area"
+                    title="Zoom in on unrotated cheque to fine-tune field positions"
                   >
                     <ZoomIn className="w-3 h-3" />
                     <span>Zoom Cheque</span>
@@ -601,11 +995,15 @@ export const AlignmentSettings: React.FC<AlignmentSettingsProps> = ({
               {/* Feeder Direction Notice */}
               <div className="flex items-center gap-1.5 text-[10px] font-mono text-emerald-800 bg-emerald-50/90 border border-emerald-200 px-3 py-1 rounded-full mb-3 shadow-xs">
                 <ArrowUp className="w-3 h-3 text-emerald-600 animate-pulse" />
-                <span>INSERT THIS EDGE INTO PRINTER TRAY FIRST (Header Cheque Alignment)</span>
+                <span>
+                  {isVerticalFeed
+                    ? `INSERT THIS SHORT EDGE (${slotWidthMm}mm) FIRST (${feedDirection === 'stub-first' ? 'Stub Edge' : 'Date Edge'}) — Anti-Jam Feed`
+                    : `INSERT THIS LONG EDGE (${slotWidthMm}mm) FIRST — Horizontal Header Feed`}
+                </span>
               </div>
 
-              {/* MODE 1: FULL PORTRAIT A4 SHEET (Aspect Ratio 210 / 297) */}
-              {viewMode === 'portrait' && (
+              {/* MODE 1: FULL A4 SHEET VIEW */}
+              {viewMode === 'sheet' && (
                 <div
                   style={{
                     width: '100%',
@@ -614,280 +1012,71 @@ export const AlignmentSettings: React.FC<AlignmentSettingsProps> = ({
                   }}
                   className="relative bg-white border border-slate-300 rounded shadow-xl overflow-hidden select-none font-sans"
                 >
-                  {/* Subtle Top Feeder Alignment Bar */}
-                  <div className="absolute top-0 left-0 right-0 h-1 bg-emerald-500/80 z-20" />
+                  {/* Tray Side Guides Dotted Lines for Vertical Feed */}
+                  {isVerticalFeed && (
+                    <>
+                      <div
+                        style={{ left: `${slotLeftPercent}%` }}
+                        className="absolute top-0 bottom-0 w-0 border-l border-dashed border-emerald-400/80 z-20 pointer-events-none"
+                      />
+                      <div
+                        style={{ left: `${slotLeftPercent + slotWidthPercent}%` }}
+                        className="absolute top-0 bottom-0 w-0 border-l border-dashed border-emerald-400/80 z-20 pointer-events-none"
+                      />
+                    </>
+                  )}
 
-                  {/* CHEQUE BOUNDARY AREA (Header portion of the Portrait A4 sheet) */}
+                  {/* Top Feeder Leading Indicator */}
+                  <div
+                    style={{
+                      left: `${slotLeftPercent}%`,
+                      width: `${slotWidthPercent}%`,
+                    }}
+                    className="absolute top-0 h-1 bg-emerald-500 z-30 flex items-center justify-center"
+                  />
+
+                  {/* CHEQUE BOUNDARY SLOT ON A4 SHEET */}
                   <div
                     style={{
                       position: 'absolute',
                       top: 0,
-                      left: 0,
-                      width: `${(draftLayout.widthMm / 210) * 100}%`,
-                      height: `${(draftLayout.heightMm / 297) * 100}%`,
+                      left: `${slotLeftPercent}%`,
+                      width: `${slotWidthPercent}%`,
+                      height: `${slotHeightPercent}%`,
                     }}
-                    className="relative overflow-hidden border-b border-dashed border-slate-400/80 bg-slate-50/20"
+                    className="relative overflow-hidden border border-dashed border-emerald-500/80 bg-slate-50/30"
                   >
-                    {/* Cheque Area Header Tag */}
-                    <div className="absolute top-1 left-1.5 text-[8px] font-mono text-slate-400 bg-white/80 px-1 rounded z-20 pointer-events-none">
-                      Cheque: {draftLayout.widthMm} &times; {draftLayout.heightMm}mm
-                    </div>
-
-                    {/* Pre-printed Indian Cheque Background Guides */}
-                    {showGuides && (
-                      <div className="absolute inset-0 pointer-events-none opacity-35">
-                        {/* Outer border guide */}
-                        <div className="absolute inset-1.5 border border-dashed border-slate-300" />
-
-                        {/* Date Boxes Guide (Top Right around 148mm, 8.5mm) */}
-                        <div
-                          style={{
-                            left: `${(148 / draftLayout.widthMm) * 100}%`,
-                            top: `${(8.5 / draftLayout.heightMm) * 100}%`,
-                            width: `${((8 * 4.0) / draftLayout.widthMm) * 100}%`,
-                          }}
-                          className="absolute flex items-center"
-                        >
-                          {['D', 'D', 'M', 'M', 'Y', 'Y', 'Y', 'Y'].map((lbl, idx) => (
-                            <div
-                              key={idx}
-                              className="flex-1 h-3.5 border border-slate-300 flex items-center justify-center text-[6px] font-mono text-slate-400 -ml-[0.5px]"
-                            >
-                              {lbl}
-                            </div>
-                          ))}
-                        </div>
-
-                        {/* PAY Guide */}
-                        <div
-                          style={{
-                            left: `${(14 / draftLayout.widthMm) * 100}%`,
-                            top: `${(21.5 / draftLayout.heightMm) * 100}%`,
-                          }}
-                          className="absolute text-[8px] font-bold text-slate-400 uppercase"
-                        >
-                          PAY
-                        </div>
-                        <div
-                          style={{
-                            left: `${(24 / draftLayout.widthMm) * 100}%`,
-                            top: `${(24.5 / draftLayout.heightMm) * 100}%`,
-                            right: '18%',
-                          }}
-                          className="absolute border-b border-dotted border-slate-300"
-                        />
-
-                        {/* RUPEES Guide */}
-                        <div
-                          style={{
-                            left: `${(14 / draftLayout.widthMm) * 100}%`,
-                            top: `${(29.5 / draftLayout.heightMm) * 100}%`,
-                          }}
-                          className="absolute text-[8px] font-bold text-slate-400 uppercase"
-                        >
-                          RUPEES
-                        </div>
-                        <div
-                          style={{
-                            left: `${(32 / draftLayout.widthMm) * 100}%`,
-                            top: `${(32.5 / draftLayout.heightMm) * 100}%`,
-                            right: '30%',
-                          }}
-                          className="absolute border-b border-dotted border-slate-300"
-                        />
-                        <div
-                          style={{
-                            left: `${(14 / draftLayout.widthMm) * 100}%`,
-                            top: `${(40.5 / draftLayout.heightMm) * 100}%`,
-                            right: '30%',
-                          }}
-                          className="absolute border-b border-dotted border-slate-300"
-                        />
-
-                        {/* ₹ Box Guide */}
-                        <div
-                          style={{
-                            left: `${(144 / draftLayout.widthMm) * 100}%`,
-                            top: `${(34 / draftLayout.heightMm) * 100}%`,
-                            width: '24%',
-                            height: '11%',
-                          }}
-                          className="absolute border border-slate-300 rounded-xs flex items-center px-1"
-                        >
-                          <span className="text-[8px] font-bold text-slate-300">₹</span>
-                        </div>
-
-                        {/* MICR Band Guide at bottom of cheque */}
-                        <div className="absolute bottom-1 left-4 right-4 h-4 border-t border-slate-200 flex items-center justify-between text-[7px] font-mono text-slate-300">
-                          <span>|&bull; 123456 |&bull;</span>
-                          <span>110002001 &bull;:</span>
-                          <span>000123 &bull; 10</span>
-                        </div>
+                    {/* Inner Rotated Cheque Container */}
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: isVerticalFeed ? `${(slotHeightMm / slotWidthMm) * 100}%` : '100%',
+                        height: isVerticalFeed ? `${(slotWidthMm / slotHeightMm) * 100}%` : '100%',
+                        transformOrigin: '0 0',
+                        transform: isVerticalFeed
+                          ? (feedDirection === 'stub-first'
+                              ? 'translate(100%, 0) rotate(90deg)'
+                              : 'translate(0, 100%) rotate(270deg)')
+                          : 'none',
+                      }}
+                      className="relative overflow-hidden font-sans text-slate-900"
+                    >
+                      {/* Cheque Area Header Tag */}
+                      <div className="absolute top-1 left-1.5 text-[8px] font-mono text-slate-400 bg-white/80 px-1 rounded z-20 pointer-events-none">
+                        {draftLayout.widthMm} &times; {draftLayout.heightMm}mm
                       </div>
-                    )}
 
-                    {/* LIVE FIELD 1: DATE (8 equal boxes with charPitch) */}
-                    <div
-                      style={{
-                        left: `${toPercentX(draftLayout.date.x)}%`,
-                        top: `${toPercentY(draftLayout.date.y)}%`,
-                        width: `${((8 * charPitch) / draftLayout.widthMm) * 100}%`,
-                      }}
-                      className={`absolute flex items-center z-10 transition-all ${
-                        activeField === 'date'
-                          ? 'ring-2 ring-emerald-500 bg-emerald-500/10 rounded px-0.5'
-                          : ''
-                      }`}
-                    >
-                      {dateChars.map((char, index) => (
-                        <div
-                          key={index}
-                          style={{
-                            fontSize: `${draftLayout.date.fontSize * fontScale}pt`,
-                            fontWeight: draftLayout.date.fontWeight === 'normal' ? 400 : 700,
-                          }}
-                          className="flex-1 text-center font-mono text-slate-900 leading-none select-none"
-                        >
-                          {char}
-                        </div>
-                      ))}
-                      {activeField === 'date' && (
-                        <span className="absolute -top-5 left-0 text-[8px] bg-emerald-700 text-white font-mono px-1 rounded shadow-xs whitespace-nowrap z-30">
-                          Date: X={draftLayout.date.x} Y={draftLayout.date.y}
-                        </span>
-                      )}
+                      {renderChequeInnerContent(fontScale)}
                     </div>
-
-                    {/* LIVE FIELD 2: PAYEE NAME */}
-                    <div
-                      style={{
-                        left: `${toPercentX(draftLayout.payee.x)}%`,
-                        top: `${toPercentY(draftLayout.payee.y)}%`,
-                        fontSize: `${draftLayout.payee.fontSize * fontScale}pt`,
-                        fontWeight: draftLayout.payee.fontWeight === 'normal' ? 400 : 700,
-                        maxWidth: `${((draftLayout.payee.maxWidth || 125) / draftLayout.widthMm) * 100}%`,
-                      }}
-                      className={`absolute z-10 truncate text-slate-900 leading-none transition-all ${
-                        activeField === 'payee'
-                          ? 'ring-2 ring-emerald-500 bg-emerald-500/10 rounded px-1'
-                          : ''
-                      }`}
-                    >
-                      <span>
-                        {draftLayout.prefixSuffixMarkers ? '** ' : ''}
-                        {sampleData.payeeName}
-                        {draftLayout.prefixSuffixMarkers ? ' **' : ''}
-                      </span>
-                      {activeField === 'payee' && (
-                        <span className="absolute -top-5 left-0 text-[8px] bg-emerald-700 text-white font-mono px-1 rounded shadow-xs whitespace-nowrap z-30">
-                          Payee: X={draftLayout.payee.x} Y={draftLayout.payee.y}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* LIVE FIELD 3: AMOUNT IN WORDS LINE 1 */}
-                    <div
-                      style={{
-                        left: `${toPercentX(draftLayout.amountInWordsLine1.x)}%`,
-                        top: `${toPercentY(draftLayout.amountInWordsLine1.y)}%`,
-                        fontSize: `${draftLayout.amountInWordsLine1.fontSize * fontScale}pt`,
-                        fontWeight: draftLayout.amountInWordsLine1.fontWeight === 'bold' ? 700 : 400,
-                        maxWidth: `${((draftLayout.amountInWordsLine1.maxWidth || 105) / draftLayout.widthMm) * 100}%`,
-                      }}
-                      className={`absolute z-10 truncate text-slate-900 leading-none transition-all ${
-                        activeField === 'amountInWordsLine1'
-                          ? 'ring-2 ring-emerald-500 bg-emerald-500/10 rounded px-1'
-                          : ''
-                      }`}
-                    >
-                      <span>{wordsLine1}</span>
-                      {activeField === 'amountInWordsLine1' && (
-                        <span className="absolute -top-5 left-0 text-[8px] bg-emerald-700 text-white font-mono px-1 rounded shadow-xs whitespace-nowrap z-30">
-                          Words 1: X={draftLayout.amountInWordsLine1.x} Y={draftLayout.amountInWordsLine1.y}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* LIVE FIELD 4: AMOUNT IN WORDS LINE 2 */}
-                    {wordsLine2 && (
-                      <div
-                        style={{
-                          left: `${toPercentX(draftLayout.amountInWordsLine2.x)}%`,
-                          top: `${toPercentY(draftLayout.amountInWordsLine2.y)}%`,
-                          fontSize: `${draftLayout.amountInWordsLine2.fontSize * fontScale}pt`,
-                          fontWeight: draftLayout.amountInWordsLine2.fontWeight === 'bold' ? 700 : 400,
-                          maxWidth: `${((draftLayout.amountInWordsLine2.maxWidth || 130) / draftLayout.widthMm) * 100}%`,
-                        }}
-                        className={`absolute z-10 truncate text-slate-900 leading-none transition-all ${
-                          activeField === 'amountInWordsLine2'
-                            ? 'ring-2 ring-emerald-500 bg-emerald-500/10 rounded px-1'
-                            : ''
-                        }`}
-                      >
-                        <span>{wordsLine2}</span>
-                        {activeField === 'amountInWordsLine2' && (
-                          <span className="absolute -top-5 left-0 text-[8px] bg-emerald-700 text-white font-mono px-1 rounded shadow-xs whitespace-nowrap z-30">
-                            Words 2: X={draftLayout.amountInWordsLine2.x} Y={draftLayout.amountInWordsLine2.y}
-                          </span>
-                        )}
-                      </div>
-                    )}
-
-                    {/* LIVE FIELD 5: AMOUNT IN NUMBERS (₹ Box) */}
-                    <div
-                      style={{
-                        left: `${toPercentX(draftLayout.amountInNumbers.x)}%`,
-                        top: `${toPercentY(draftLayout.amountInNumbers.y)}%`,
-                        fontSize: `${draftLayout.amountInNumbers.fontSize * fontScale}pt`,
-                        fontWeight: draftLayout.amountInNumbers.fontWeight === 'normal' ? 400 : 700,
-                      }}
-                      className={`absolute z-10 font-mono text-slate-900 leading-none transition-all ${
-                        activeField === 'amountInNumbers'
-                          ? 'ring-2 ring-emerald-500 bg-emerald-500/10 rounded px-1'
-                          : ''
-                      }`}
-                    >
-                      <span>{formattedAmount}</span>
-                      {activeField === 'amountInNumbers' && (
-                        <span className="absolute -top-5 left-0 text-[8px] bg-emerald-700 text-white font-mono px-1 rounded shadow-xs whitespace-nowrap z-30">
-                          ₹ Box: X={draftLayout.amountInNumbers.x} Y={draftLayout.amountInNumbers.y}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* LIVE FIELD 6: A/C PAYEE */}
-                    {sampleData.isAcPayee && (
-                      <div
-                        style={{
-                          left: `${toPercentX(draftLayout.acPayee.x)}%`,
-                          top: `${toPercentY(draftLayout.acPayee.y)}%`,
-                        }}
-                        className={`absolute z-10 transition-all ${
-                          activeField === 'acPayee' ? 'ring-2 ring-emerald-500 rounded' : ''
-                        }`}
-                      >
-                        <div
-                          style={{
-                            fontSize: `${draftLayout.acPayee.fontSize * (fontScale * 0.9)}pt`,
-                          }}
-                          className="flex flex-col items-center justify-center border-t border-b border-slate-900 px-1 py-0.5 text-slate-900 font-bold tracking-wider -rotate-30 origin-center bg-white/80"
-                        >
-                          A/C PAYEE ONLY
-                        </div>
-                        {activeField === 'acPayee' && (
-                          <span className="absolute -top-5 left-0 text-[8px] bg-emerald-700 text-white font-mono px-1 rounded shadow-xs whitespace-nowrap z-30">
-                            A/C Payee: X={draftLayout.acPayee.x} Y={draftLayout.acPayee.y}
-                          </span>
-                        )}
-                      </div>
-                    )}
                   </div>
 
-                  {/* BOTTOM PORTION: Plain A4 Paper Area */}
+                  {/* BOTTOM PORTION: Plain A4 Paper Tray Area */}
                   <div
                     style={{
                       position: 'absolute',
-                      top: `${(draftLayout.heightMm / 297) * 100}%`,
+                      top: `${slotHeightPercent}%`,
                       left: 0,
                       right: 0,
                       bottom: 0,
@@ -895,19 +1084,19 @@ export const AlignmentSettings: React.FC<AlignmentSettingsProps> = ({
                     className="p-4 flex flex-col items-center justify-center text-center opacity-40 pointer-events-none"
                   >
                     <div className="w-full border-t border-dashed border-slate-300 pt-1 text-[8px] font-mono text-slate-400 mb-6">
-                      &uarr; Cheque edge ({draftLayout.heightMm}mm) &bull; Remainder of A4 sheet
+                      &uarr; Physical Cheque Edge ({slotHeightMm}mm) &bull; Remainder of A4 tray
                     </div>
                     <span className="text-[10px] text-slate-300 uppercase tracking-widest font-mono font-medium">
-                      Plain A4 Paper Feeder Area
+                      Plain A4 Printer Feeder Area
                     </span>
                     <span className="text-[8px] text-slate-300 font-mono mt-1">
-                      (210 &times; 297 mm Portrait Page)
+                      (210 &times; 297 mm Page)
                     </span>
                   </div>
                 </div>
               )}
 
-              {/* MODE 2: ZOOMED CHEQUE VIEW (Aspect Ratio 203 / 93) */}
+              {/* MODE 2: ZOOMED CHEQUE VIEW */}
               {viewMode === 'zoom' && (
                 <div
                   style={{
@@ -920,251 +1109,10 @@ export const AlignmentSettings: React.FC<AlignmentSettingsProps> = ({
                   {/* Outer Dashed Cheque Boundary */}
                   <div className="absolute inset-0 border border-dashed border-slate-400 pointer-events-none" />
 
-                  {/* Background Cheque Pre-printed Guides */}
-                  {showGuides && (
-                    <div className="absolute inset-0 pointer-events-none opacity-40">
-                      {/* Date Guide */}
-                      <div
-                        style={{
-                          left: `${(148 / draftLayout.widthMm) * 100}%`,
-                          top: `${(8.5 / draftLayout.heightMm) * 100}%`,
-                          width: `${((8 * 4.0) / draftLayout.widthMm) * 100}%`,
-                        }}
-                        className="absolute flex items-center"
-                      >
-                        {['D', 'D', 'M', 'M', 'Y', 'Y', 'Y', 'Y'].map((lbl, idx) => (
-                          <div
-                            key={idx}
-                            className="flex-1 h-4 border border-slate-300 flex items-center justify-center text-[7px] font-mono text-slate-400 -ml-[0.5px]"
-                          >
-                            {lbl}
-                          </div>
-                        ))}
-                      </div>
-
-                      {/* PAY Guide */}
-                      <div
-                        style={{
-                          left: `${(14 / draftLayout.widthMm) * 100}%`,
-                          top: `${(21.5 / draftLayout.heightMm) * 100}%`,
-                        }}
-                        className="absolute text-[9px] font-bold text-slate-400 uppercase"
-                      >
-                        PAY
-                      </div>
-                      <div
-                        style={{
-                          left: `${(24 / draftLayout.widthMm) * 100}%`,
-                          top: `${(24.5 / draftLayout.heightMm) * 100}%`,
-                          right: '18%',
-                        }}
-                        className="absolute border-b border-dotted border-slate-300"
-                      />
-
-                      {/* RUPEES Guide */}
-                      <div
-                        style={{
-                          left: `${(14 / draftLayout.widthMm) * 100}%`,
-                          top: `${(29.5 / draftLayout.heightMm) * 100}%`,
-                        }}
-                        className="absolute text-[9px] font-bold text-slate-400 uppercase"
-                      >
-                        RUPEES
-                      </div>
-                      <div
-                        style={{
-                          left: `${(32 / draftLayout.widthMm) * 100}%`,
-                          top: `${(32.5 / draftLayout.heightMm) * 100}%`,
-                          right: '30%',
-                        }}
-                        className="absolute border-b border-dotted border-slate-300"
-                      />
-                      <div
-                        style={{
-                          left: `${(14 / draftLayout.widthMm) * 100}%`,
-                          top: `${(40.5 / draftLayout.heightMm) * 100}%`,
-                          right: '30%',
-                        }}
-                        className="absolute border-b border-dotted border-slate-300"
-                      />
-
-                      {/* ₹ Box Guide */}
-                      <div
-                        style={{
-                          left: `${(144 / draftLayout.widthMm) * 100}%`,
-                          top: `${(34 / draftLayout.heightMm) * 100}%`,
-                          width: '24%',
-                          height: '13%',
-                        }}
-                        className="absolute border border-slate-300 rounded-xs flex items-center px-1.5"
-                      >
-                        <span className="text-[10px] font-bold text-slate-300">₹</span>
-                      </div>
-
-                      {/* Bottom MICR strip */}
-                      <div className="absolute bottom-1.5 left-6 right-6 h-4 border-t border-slate-200 flex items-center justify-between text-[8px] font-mono text-slate-300">
-                        <span>|&bull; 123456 |&bull;</span>
-                        <span>110002001 &bull;:</span>
-                        <span>000123 &bull; 10</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* LIVE FIELD 1: DATE */}
-                  <div
-                    style={{
-                      left: `${toPercentX(draftLayout.date.x)}%`,
-                      top: `${toPercentY(draftLayout.date.y)}%`,
-                      width: `${((8 * charPitch) / draftLayout.widthMm) * 100}%`,
-                    }}
-                    className={`absolute flex items-center z-10 transition-all ${
-                      activeField === 'date'
-                        ? 'ring-2 ring-emerald-500 bg-emerald-500/10 rounded px-0.5'
-                        : ''
-                    }`}
-                  >
-                    {dateChars.map((char, index) => (
-                      <div
-                        key={index}
-                        style={{
-                          fontSize: `${draftLayout.date.fontSize * fontScale}pt`,
-                          fontWeight: draftLayout.date.fontWeight === 'normal' ? 400 : 700,
-                        }}
-                        className="flex-1 text-center font-mono text-slate-900 leading-none select-none"
-                      >
-                        {char}
-                      </div>
-                    ))}
-                    {activeField === 'date' && (
-                      <span className="absolute -top-5 left-0 text-[9px] bg-emerald-700 text-white font-mono px-1 rounded shadow-xs whitespace-nowrap z-30">
-                        Date: X={draftLayout.date.x} Y={draftLayout.date.y} Pitch={charPitch}mm
-                      </span>
-                    )}
+                  {/* Zoom View Cheque Area */}
+                  <div className="relative w-full h-full">
+                    {renderChequeInnerContent(0.88)}
                   </div>
-
-                  {/* LIVE FIELD 2: PAYEE NAME */}
-                  <div
-                    style={{
-                      left: `${toPercentX(draftLayout.payee.x)}%`,
-                      top: `${toPercentY(draftLayout.payee.y)}%`,
-                      fontSize: `${draftLayout.payee.fontSize * fontScale}pt`,
-                      fontWeight: draftLayout.payee.fontWeight === 'normal' ? 400 : 700,
-                      maxWidth: `${((draftLayout.payee.maxWidth || 125) / draftLayout.widthMm) * 100}%`,
-                    }}
-                    className={`absolute z-10 truncate text-slate-900 leading-none transition-all ${
-                      activeField === 'payee'
-                        ? 'ring-2 ring-emerald-500 bg-emerald-500/10 rounded px-1'
-                        : ''
-                    }`}
-                  >
-                    <span>
-                      {draftLayout.prefixSuffixMarkers ? '** ' : ''}
-                      {sampleData.payeeName}
-                      {draftLayout.prefixSuffixMarkers ? ' **' : ''}
-                    </span>
-                    {activeField === 'payee' && (
-                      <span className="absolute -top-5 left-0 text-[9px] bg-emerald-700 text-white font-mono px-1 rounded shadow-xs whitespace-nowrap z-30">
-                        Payee: X={draftLayout.payee.x} Y={draftLayout.payee.y}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* LIVE FIELD 3: AMOUNT IN WORDS LINE 1 */}
-                  <div
-                    style={{
-                      left: `${toPercentX(draftLayout.amountInWordsLine1.x)}%`,
-                      top: `${toPercentY(draftLayout.amountInWordsLine1.y)}%`,
-                      fontSize: `${draftLayout.amountInWordsLine1.fontSize * fontScale}pt`,
-                      fontWeight: draftLayout.amountInWordsLine1.fontWeight === 'bold' ? 700 : 400,
-                      maxWidth: `${((draftLayout.amountInWordsLine1.maxWidth || 105) / draftLayout.widthMm) * 100}%`,
-                    }}
-                    className={`absolute z-10 truncate text-slate-900 leading-none transition-all ${
-                      activeField === 'amountInWordsLine1'
-                        ? 'ring-2 ring-emerald-500 bg-emerald-500/10 rounded px-1'
-                        : ''
-                    }`}
-                  >
-                    <span>{wordsLine1}</span>
-                    {activeField === 'amountInWordsLine1' && (
-                      <span className="absolute -top-5 left-0 text-[9px] bg-emerald-700 text-white font-mono px-1 rounded shadow-xs whitespace-nowrap z-30">
-                        Words 1: X={draftLayout.amountInWordsLine1.x} Y={draftLayout.amountInWordsLine1.y}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* LIVE FIELD 4: AMOUNT IN WORDS LINE 2 */}
-                  {wordsLine2 && (
-                    <div
-                      style={{
-                        left: `${toPercentX(draftLayout.amountInWordsLine2.x)}%`,
-                        top: `${toPercentY(draftLayout.amountInWordsLine2.y)}%`,
-                        fontSize: `${draftLayout.amountInWordsLine2.fontSize * fontScale}pt`,
-                        fontWeight: draftLayout.amountInWordsLine2.fontWeight === 'bold' ? 700 : 400,
-                        maxWidth: `${((draftLayout.amountInWordsLine2.maxWidth || 130) / draftLayout.widthMm) * 100}%`,
-                      }}
-                      className={`absolute z-10 truncate text-slate-900 leading-none transition-all ${
-                        activeField === 'amountInWordsLine2'
-                          ? 'ring-2 ring-emerald-500 bg-emerald-500/10 rounded px-1'
-                          : ''
-                      }`}
-                    >
-                      <span>{wordsLine2}</span>
-                      {activeField === 'amountInWordsLine2' && (
-                        <span className="absolute -top-5 left-0 text-[9px] bg-emerald-700 text-white font-mono px-1 rounded shadow-xs whitespace-nowrap z-30">
-                          Words 2: X={draftLayout.amountInWordsLine2.x} Y={draftLayout.amountInWordsLine2.y}
-                        </span>
-                      )}
-                    </div>
-                  )}
-
-                  {/* LIVE FIELD 5: AMOUNT IN NUMBERS */}
-                  <div
-                    style={{
-                      left: `${toPercentX(draftLayout.amountInNumbers.x)}%`,
-                      top: `${toPercentY(draftLayout.amountInNumbers.y)}%`,
-                      fontSize: `${draftLayout.amountInNumbers.fontSize * fontScale}pt`,
-                      fontWeight: draftLayout.amountInNumbers.fontWeight === 'normal' ? 400 : 700,
-                    }}
-                    className={`absolute z-10 font-mono text-slate-900 leading-none transition-all ${
-                      activeField === 'amountInNumbers'
-                        ? 'ring-2 ring-emerald-500 bg-emerald-500/10 rounded px-1'
-                        : ''
-                    }`}
-                  >
-                    <span>{formattedAmount}</span>
-                    {activeField === 'amountInNumbers' && (
-                      <span className="absolute -top-5 left-0 text-[9px] bg-emerald-700 text-white font-mono px-1 rounded shadow-xs whitespace-nowrap z-30">
-                        ₹ Box: X={draftLayout.amountInNumbers.x} Y={draftLayout.amountInNumbers.y}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* LIVE FIELD 6: A/C PAYEE */}
-                  {sampleData.isAcPayee && (
-                    <div
-                      style={{
-                        left: `${toPercentX(draftLayout.acPayee.x)}%`,
-                        top: `${toPercentY(draftLayout.acPayee.y)}%`,
-                      }}
-                      className={`absolute z-10 transition-all ${
-                        activeField === 'acPayee' ? 'ring-2 ring-emerald-500 rounded' : ''
-                      }`}
-                    >
-                      <div
-                        style={{
-                          fontSize: `${draftLayout.acPayee.fontSize * (fontScale * 0.9)}pt`,
-                        }}
-                        className="flex flex-col items-center justify-center border-t border-b border-slate-900 px-1 py-0.5 text-slate-900 font-bold tracking-wider -rotate-30 origin-center bg-white/80"
-                      >
-                        A/C PAYEE ONLY
-                      </div>
-                      {activeField === 'acPayee' && (
-                        <span className="absolute -top-5 left-0 text-[9px] bg-emerald-700 text-white font-mono px-1 rounded shadow-xs whitespace-nowrap z-30">
-                          A/C Payee: X={draftLayout.acPayee.x} Y={draftLayout.acPayee.y}
-                        </span>
-                      )}
-                    </div>
-                  )}
                 </div>
               )}
 
@@ -1174,7 +1122,7 @@ export const AlignmentSettings: React.FC<AlignmentSettingsProps> = ({
                   Offset: <strong className="text-slate-700">X:{draftLayout.globalOffsetX}mm, Y:{draftLayout.globalOffsetY}mm</strong>
                 </span>
                 <span>
-                  Cheque: <strong className="text-slate-700">{draftLayout.widthMm}&times;{draftLayout.heightMm}mm</strong>
+                  Feed: <strong className="text-slate-700">{isVerticalFeed ? 'Vertical 93mm (Anti-Jam)' : 'Horizontal 203mm'}</strong>
                 </span>
               </div>
             </div>

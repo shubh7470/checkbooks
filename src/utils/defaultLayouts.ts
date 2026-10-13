@@ -9,6 +9,9 @@ export const DEFAULT_CTS_2010_LAYOUT: ChequeLayout = {
   heightMm: 93,
   globalOffsetX: 0,
   globalOffsetY: 0,
+  feedOrientation: 'vertical',
+  feedDirection: 'stub-first',
+  trayAlignment: 'center',
   date: {
     x: 148,
     y: 11.5,

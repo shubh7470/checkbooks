@@ -53,6 +53,14 @@ export const ChequePreview: React.FC<ChequePreviewProps> = ({
             <span className="text-[11px] font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
               {layout.widthMm}mm &times; {layout.heightMm}mm
             </span>
+            <button
+              type="button"
+              onClick={onOpenSettings}
+              className="text-[10px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 px-2 py-0.5 rounded-md transition-colors cursor-pointer flex items-center gap-1"
+              title="Click to configure printer feed orientation & tray alignment"
+            >
+              <span>Feed: {(layout.feedOrientation || 'vertical') === 'vertical' ? 'Anti-Jam 93mm' : 'Horizontal'}</span>
+            </button>
           </div>
           <p className="text-xs text-slate-500 mt-0.5">
             Only the variable text below will be physically printed onto your cheque
